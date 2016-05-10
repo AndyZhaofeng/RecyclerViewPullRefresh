@@ -47,7 +47,7 @@ public class DemoAdapter extends RecyclerView.Adapter<DemoAdapter.DemoViewHolder
 
     @Override
     public void onBindViewHolder(DemoViewHolder holder, int position) {
-        holder.addDetail(position);
+            holder.addDetail(position);
     }
 
     @Override

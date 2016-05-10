@@ -1,83 +1,129 @@
 package com.example.zhaofeng.recyclerviewpullrefresh;
 
 import android.content.Context;
+import android.os.Build;
 import android.support.annotation.Nullable;
+import android.support.v4.view.NestedScrollingChild;
+import android.support.v4.view.NestedScrollingParent;
+import android.support.v4.view.ViewCompat;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
 
 /**
- * Created by zhaofeng on 16/5/9.
+ * Created by zhaofeng on 16/5/9
  */
-public class RecyclerViewRefresh extends RecyclerView
+public class RecyclerViewRefresh extends ViewGroup implements NestedScrollingParent,NestedScrollingChild
 {
-    View headerView;//顶部布局文件
-    int headerHeight;//顶部布局文件的高度；
-    int firstVisibleItem;//当前第一个可见的item的位置
-    int scrollState;//listview当前滚动状态
-    boolean isRemark;//标记，当前是在listview最顶端摁下的
-    int startY;//摁下时的Y值
+    static final int STATE_PRESS=0;
+    static final int STATE_DRAG_DOWN=1;
+    static final int STATE_DRAG_UP=2;
+    static final int STATE_RELEASE_DOWN=3;
+    static final int STATE_RELEASE_UP=4;
 
-    int state;//当前的状态；
-    final int NONE=0;//正常状态
-    final int PULL=1;//提示下拉状态
-    final int RELESE=2;//提示释放状态
-    final int REFLASHING=3;//刷新状态
+    private View mTarget; //the target of the gesture
+    private OnPullToRefresh refreshListener;
+    private OnDragToLoad loadListener;
 
     public RecyclerViewRefresh(Context context) {
         super(context);
     }
 
-    public RecyclerViewRefresh(Context context, @Nullable AttributeSet attrs) {
+    public RecyclerViewRefresh(Context context, AttributeSet attrs) {
         super(context, attrs);
+
     }
 
-    public RecyclerViewRefresh(Context context, @Nullable AttributeSet attrs, int defStyle) {
-        super(context, attrs, defStyle);
-    }
-
-    private void initView(Context context)
-    {
-        LayoutInflater inflater=LayoutInflater.from(context);
-        headerView=inflater.inflate(R.layout.header_layout,null);
-        measureView(headerView);
-        headerHeight=headerView.getMeasuredHeight();
-        topPadding(--headerHeight);
+    public RecyclerViewRefresh(Context context, AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
     }
 
     /**
-     * 通知父布局，占用的宽、高
-     * @param view
+     * Set the listener to be notified when a refresh is triggered via the
+     * pull gesture.
+     * @param listener
      */
-    private void measureView(View view)
+    public void setOnPullToRefresh(OnPullToRefresh listener)
     {
-        ViewGroup.LayoutParams p=view.getLayoutParams();
-        if(p==null){
-            p=new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT);
+        this.refreshListener=listener;
+    }
+
+    /**
+     * Set the listener to be notified when a load is triggered via the
+     * drag gesture
+     * @param listener
+     */
+    public void setOnDragToLoad(OnDragToLoad listener)
+    {
+        this.loadListener=listener;
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+
+    }
+    private void ensureTarget(){
+        if(mTarget==null){
+            for(int i=0;i<getChildCount();i++)
+            {
+                View child=getChildAt(i);
+                if(child instanceof RecyclerView)
+                {
+                    mTarget=child;
+                    break;
+                }
+            }
         }
-        int width=ViewGroup.getChildMeasureSpec(0,0,p.width);
-        int height;
-        int tempHeight=p.height;
-        if(tempHeight>0){
-            height=MeasureSpec.makeMeasureSpec(tempHeight,MeasureSpec.EXACTLY);
+    }
+
+    /**
+     * @return Whether it is possible for the child view of this layout to
+     * scroll up.Override this if the child view is a custom view.
+     */
+    public boolean canChildScrollUp(){
+        if(mTarget==null)
+        {
+            ensureTarget();
+        }
+        if(Build.VERSION.SDK_INT<14)
+        {
+            if(mTarget instanceof AbsListView)
+            {
+                final AbsListView absListView=(AbsListView)mTarget;
+                return absListView.getChildCount()>0
+                        &&(absListView.getFirstVisiblePosition()>0
+                        ||absListView.getChildAt(0).getTop()<absListView.getPaddingTop());
+            }else{
+                return ViewCompat.canScrollVertically(mTarget,-1)|| mTarget.getScrollY()>0;
+            }
         }else{
-            height=MeasureSpec.makeMeasureSpec(0,MeasureSpec.UNSPECIFIED);
+            return ViewCompat.canScrollVertically(mTarget,-1);
         }
-        view.measure(width,height);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        return true;
     }
 
     /**
-     * 设置header布局 上边距
-     * @param topPadding
+     * Classes that wish to be notified when the pull gesture correctly
+     * triggers a refresh should implement this interface.
      */
-    private void topPadding(int topPadding)
-    {
-        headerView.setPadding(headerView.getPaddingLeft(),topPadding,
-                headerView.getPaddingRight(),headerView.getPaddingBottom());
-        headerView.invalidate();
+    public interface OnPullToRefresh{
+        public void onRefresh();
     }
 
+    /**
+     * Classes that wish to be notified when the drag gesture correctly
+     * triggers a load should implement this interface.
+     */
+    public interface OnDragToLoad{
+        public void onLoad();
+    }
 }
