@@ -4,6 +4,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.widget.LinearLayout;
 
 import com.google.common.collect.Lists;
 
@@ -14,6 +15,8 @@ import butterknife.ButterKnife;
 
 public class MainActivity extends AppCompatActivity {
 
+    @Bind(R.id.refreshpull)
+    RecyclerViewRefresh recyclerViewRefresh;
     @Bind(R.id.recyclerview)
     RecyclerView recyclerView;
     DemoAdapter demoAdapter;
