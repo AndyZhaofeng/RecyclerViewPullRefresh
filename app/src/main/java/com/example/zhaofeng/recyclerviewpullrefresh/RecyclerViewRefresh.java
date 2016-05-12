@@ -2,6 +2,8 @@ package com.example.zhaofeng.recyclerviewpullrefresh;
 
 import android.content.Context;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Message;
 import android.support.annotation.Nullable;
 import android.support.v4.view.MotionEventCompat;
 import android.support.v4.view.NestedScrollingChild;
@@ -17,9 +19,18 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.RotateAnimation;
+import android.view.animation.Transformation;
+import android.view.animation.TranslateAnimation;
 import android.widget.AbsListView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
+import android.widget.TextView;
+
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Created by zhaofeng on 16/5/9
@@ -38,8 +49,10 @@ public class RecyclerViewRefresh extends LinearLayout
     private static final int DEFAULT_CIRCLE_TARGET=64;
     private static final float DRAG_RATE=.5f;
 
-    private View headerView,footerView;
+    private View headerView,footerView,thisView;
     private View mTarget; //the target of the gesture
+    private ImageView arrowIv;
+    private TextView refreshTv;
     private OnPullToRefresh refreshListener;
     private OnDragToLoad loadListener;
     float startY=0;
@@ -57,6 +70,9 @@ public class RecyclerViewRefresh extends LinearLayout
     private float mTotalDragDistance=-1;
     private float mInitialMotionY;
     private float mSpinnerFinalOffset;
+    private boolean updateHeader=true;
+    private Handler handler=new Handler();
+    private Timer timer;
 
     public RecyclerViewRefresh(Context context) {
         super(context);
@@ -74,10 +90,13 @@ public class RecyclerViewRefresh extends LinearLayout
     }
     private void initView(Context context)
     {
+        thisView=this;
         mTouchSlop= ViewConfiguration.get(context).getScaledTouchSlop();
         headerView=LayoutInflater.from(context).inflate(R.layout.header_layout,null);
         footerView=LayoutInflater.from(context).inflate(R.layout.header_layout,null);
         measureView(headerView);
+        arrowIv=(ImageView)headerView.findViewById(R.id.arrow);
+        refreshTv=(TextView)headerView.findViewById(R.id.tip);
         headerHeight=headerView.getMeasuredHeight();
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 headerView.getMeasuredHeight());
@@ -115,11 +134,11 @@ public class RecyclerViewRefresh extends LinearLayout
 //        ViewGroup.LayoutParams lp=headerView.getLayoutParams();
         if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.HONEYCOMB)
         {
-            headerView.setY(-height);
+            this.setY(-height);
         }else{
             LayoutParams lp=new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,height);
             lp.topMargin=-height;
-            headerView.setLayoutParams(lp);
+            this.setLayoutParams(lp);
         }
         headerView.invalidate();
     }
@@ -244,11 +263,28 @@ public class RecyclerViewRefresh extends LinearLayout
         return MotionEventCompat.getY(ev,index);
     }
     private void setTargetOffsetTopAndBottom(int offset,boolean requiresUpdate){
-        headerView.offsetTopAndBottom(offset);
-        mCurrentTargetOffsetTop=headerView.getTop();
-        if(requiresUpdate && Build.VERSION.SDK_INT<11){
-            invalidate();
+        if(this.getTop()<headerHeight)
+        {
+            this.offsetTopAndBottom(offset);
+            mCurrentTargetOffsetTop=this.getTop();
+            if(requiresUpdate && Build.VERSION.SDK_INT<11){
+                invalidate();
+            }
+
+            if(this.getTop()>(headerHeight-30))
+            {
+                if(updateHeader){
+                    updateHeader=false;
+                    refreshTv.setText("松开刷新");
+                    RotateAnimation animation=new RotateAnimation(0,180,
+                            Animation.RELATIVE_TO_SELF,0.5f,Animation.RELATIVE_TO_SELF,0.5f);
+                    animation.setDuration(800);
+                    animation.setFillAfter(true);
+                    arrowIv.startAnimation(animation);
+                }
+            }
         }
+
     }
 
     private void onSecondaryPointerUp(MotionEvent ev){
@@ -279,6 +315,7 @@ public class RecyclerViewRefresh extends LinearLayout
             case MotionEvent.ACTION_DOWN:
                 mActivePointerId=MotionEventCompat.getPointerId(event,0);
                 mIsBeingDragged=false;
+                updateHeader=true;
                 break;
             case MotionEvent.ACTION_MOVE:{
                 pointerIndex=MotionEventCompat.findPointerIndex(event,mActivePointerId);
@@ -318,7 +355,7 @@ public class RecyclerViewRefresh extends LinearLayout
                 final float y=MotionEventCompat.getY(event,pointerIndex);
                 final float overscrollTop=(y-mInitialMotionY)*DRAG_RATE;
                 mIsBeingDragged=false;
-//                finishSpinner(overscrollTop);
+                finishSpinner(overscrollTop);
                 mActivePointerId=INVALID_POINTER;
                 return false;
             }
@@ -341,6 +378,49 @@ public class RecyclerViewRefresh extends LinearLayout
 
         int targetY=mOriginalOffsetTop+(int)((slingshotDist*dragPercent)+extraMove);
         setTargetOffsetTopAndBottom(targetY-mCurrentTargetOffsetTop,true);
+    }
+    private void finishSpinner(float overscrollTop){
+        if(overscrollTop>mTotalDragDistance){
+//            setRefreshing(true,true);
+        }else{
+            //cancel refresh
+            mRefreshing=false;
+
+        }
+        animateOffsetToStartPosition();
+    }
+    private void animateOffsetToStartPosition(){
+//        TranslateAnimation animation=new TranslateAnimation(this.getX(),this.getX(),
+//                0,-headerHeight);
+//        animation.setDuration(800);
+//        animation.setFillAfter(true);
+//        this.startAnimation(animation);
+        timer=new Timer();
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if(thisView.getTop()>0)
+                        {
+                            thisView.offsetTopAndBottom(-3);
+                            mCurrentTargetOffsetTop = headerView.getTop();
+                            if ( Build.VERSION.SDK_INT < 11) {
+                                invalidate();
+                            }
+                        }else{
+                            timer.cancel();
+                        }
+                    }
+                });
+            }
+        },10,10);
+
+        if(this.getTop()<headerHeight) {
+
+
+        }
     }
 
     /**

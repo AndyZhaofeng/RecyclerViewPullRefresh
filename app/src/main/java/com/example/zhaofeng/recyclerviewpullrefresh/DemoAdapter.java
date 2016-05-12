@@ -7,6 +7,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -33,9 +34,15 @@ public class DemoAdapter extends RecyclerView.Adapter<DemoAdapter.DemoViewHolder
             super(itemView);
             tv=(TextView)itemView.findViewById(R.id.item_tv);
         }
-        public void addDetail(int position)
+        public void addDetail(final int position)
         {
             tv.setText(list.get(position));
+            tv.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Toast.makeText(context,list.get(position),Toast.LENGTH_SHORT).show();
+                }
+            });
         }
     }
 
