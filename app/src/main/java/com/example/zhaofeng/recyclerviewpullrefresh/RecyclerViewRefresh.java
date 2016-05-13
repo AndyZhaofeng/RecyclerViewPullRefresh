@@ -26,6 +26,7 @@ import android.view.animation.TranslateAnimation;
 import android.widget.AbsListView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
@@ -38,11 +39,6 @@ import java.util.TimerTask;
 public class RecyclerViewRefresh extends LinearLayout
 {
     private static final String LOG_TAG=RecyclerViewRefresh.class.getSimpleName();
-    static final int STATE_PRESS=0;
-    static final int STATE_DRAG_DOWN=1;
-    static final int STATE_DRAG_UP=2;
-    static final int STATE_RELEASE_DOWN=3;
-    static final int STATE_RELEASE_UP=4;
     private static final int INVALID_POINTER=-1;
     //Default offset in dips from the top of the view to where the progress
     //spinner should stop
@@ -53,11 +49,12 @@ public class RecyclerViewRefresh extends LinearLayout
     private View mTarget; //the target of the gesture
     private ImageView arrowIv;
     private TextView refreshTv;
-    private OnPullToRefresh refreshListener;
-    private OnDragToLoad loadListener;
+    private ProgressBar progressBar;
+    private OnPullToRefresh refreshListener=null;
+    private OnDragToLoad loadListener=null;
     float startY=0;
 
-    private int headerHeight=0;
+    private int headerHeight=0,currentHeaderHeight=0;
     private boolean mReturningToStart;
     private boolean mRefreshing=false;
     private boolean mNestedScrollInProgress;
@@ -97,7 +94,9 @@ public class RecyclerViewRefresh extends LinearLayout
         measureView(headerView);
         arrowIv=(ImageView)headerView.findViewById(R.id.arrow);
         refreshTv=(TextView)headerView.findViewById(R.id.tip);
+        progressBar=(ProgressBar)headerView.findViewById(R.id.progress);
         headerHeight=headerView.getMeasuredHeight();
+        currentHeaderHeight=headerHeight;
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 headerView.getMeasuredHeight());
         this.addView(headerView,lp);
@@ -227,6 +226,7 @@ public class RecyclerViewRefresh extends LinearLayout
                     return false;
                 }
                 mInitailDownY=initialDownY;
+                updateHeader=true;
                 break;
             case MotionEvent.ACTION_MOVE:
                 if(mActivePointerId==INVALID_POINTER){
@@ -250,6 +250,7 @@ public class RecyclerViewRefresh extends LinearLayout
             case MotionEvent.ACTION_CANCEL:
                 mIsBeingDragged=false;
                 mActivePointerId=INVALID_POINTER;
+                Log.d(LOG_TAG,"intercept top="+thisView.getTop());
                 break;
         }
         return mIsBeingDragged;
@@ -263,25 +264,27 @@ public class RecyclerViewRefresh extends LinearLayout
         return MotionEventCompat.getY(ev,index);
     }
     private void setTargetOffsetTopAndBottom(int offset,boolean requiresUpdate){
-        if(this.getTop()<headerHeight)
+        if(currentHeaderHeight>-5)
         {
-            this.offsetTopAndBottom(offset);
+            currentHeaderHeight-=offset;
+            this.setY(-currentHeaderHeight);
             mCurrentTargetOffsetTop=this.getTop();
             if(requiresUpdate && Build.VERSION.SDK_INT<11){
                 invalidate();
             }
 
-            if(this.getTop()>(headerHeight-30))
+            if(currentHeaderHeight<0)
             {
                 if(updateHeader){
                     updateHeader=false;
-                    refreshTv.setText("松开刷新");
+                    refreshTv.setText(getResources().getText(R.string.releasetorefresh));
                     RotateAnimation animation=new RotateAnimation(0,180,
                             Animation.RELATIVE_TO_SELF,0.5f,Animation.RELATIVE_TO_SELF,0.5f);
                     animation.setDuration(800);
                     animation.setFillAfter(true);
                     arrowIv.startAnimation(animation);
                 }
+                Log.d(LOG_TAG,"top="+this.getY());
             }
         }
 
@@ -315,7 +318,6 @@ public class RecyclerViewRefresh extends LinearLayout
             case MotionEvent.ACTION_DOWN:
                 mActivePointerId=MotionEventCompat.getPointerId(event,0);
                 mIsBeingDragged=false;
-                updateHeader=true;
                 break;
             case MotionEvent.ACTION_MOVE:{
                 pointerIndex=MotionEventCompat.findPointerIndex(event,mActivePointerId);
@@ -353,9 +355,8 @@ public class RecyclerViewRefresh extends LinearLayout
                     return false;
                 }
                 final float y=MotionEventCompat.getY(event,pointerIndex);
-                final float overscrollTop=(y-mInitialMotionY)*DRAG_RATE;
                 mIsBeingDragged=false;
-                finishSpinner(overscrollTop);
+                finishSpinner();
                 mActivePointerId=INVALID_POINTER;
                 return false;
             }
@@ -379,47 +380,72 @@ public class RecyclerViewRefresh extends LinearLayout
         int targetY=mOriginalOffsetTop+(int)((slingshotDist*dragPercent)+extraMove);
         setTargetOffsetTopAndBottom(targetY-mCurrentTargetOffsetTop,true);
     }
-    private void finishSpinner(float overscrollTop){
-        if(overscrollTop>mTotalDragDistance){
-//            setRefreshing(true,true);
+    private void finishSpinner(){
+        if(currentHeaderHeight<0){
+            setRefreshing(true,true);
         }else{
             //cancel refresh
             mRefreshing=false;
-
+            animateOffsetToStartPosition();
         }
-        animateOffsetToStartPosition();
+    }
+    private void setRefreshing(boolean refreshing,final boolean notify)
+    {
+        if(mRefreshing!=refreshing){
+            ensureTarget();
+            mRefreshing=refreshing;
+            if(mRefreshing){
+                refreshListener.onRefresh();
+                arrowIv.setVisibility(View.GONE);
+                arrowIv.clearAnimation();
+                progressBar.setVisibility(View.VISIBLE);
+            }else{
+                arrowIv.setVisibility(View.GONE);
+                progressBar.setVisibility(View.GONE);
+                refreshTv.setText(getResources().getText(R.string.afterrefresh));
+                animateOffsetToStartPosition();
+            }
+        }
+    }
+    public void setRefreshing(boolean refreshing){
+        if(!refreshing){
+            setRefreshing(refreshing,false);
+        }
     }
     private void animateOffsetToStartPosition(){
-//        TranslateAnimation animation=new TranslateAnimation(this.getX(),this.getX(),
-//                0,-headerHeight);
-//        animation.setDuration(800);
-//        animation.setFillAfter(true);
-//        this.startAnimation(animation);
-        timer=new Timer();
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                handler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if(thisView.getTop()>0)
-                        {
-                            thisView.offsetTopAndBottom(-3);
-                            mCurrentTargetOffsetTop = headerView.getTop();
-                            if ( Build.VERSION.SDK_INT < 11) {
-                                invalidate();
+        refreshTv.setText(getResources().getText(R.string.pulltorefresh));
+        arrowIv.clearAnimation();
+        if(timer==null&&currentHeaderHeight<headerHeight)
+        {
+
+            timer=new Timer();
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if(currentHeaderHeight<headerHeight)
+                            {
+                                currentHeaderHeight+=5;
+                                thisView.setY(-currentHeaderHeight);
+                                mCurrentTargetOffsetTop = headerView.getTop();
+                                if ( Build.VERSION.SDK_INT < 11) {
+                                    invalidate();
+                                }
+                            }else{
+                                if(timer!=null)
+                                {
+                                    arrowIv.setVisibility(View.VISIBLE);
+                                    progressBar.setVisibility(View.GONE);
+                                    timer.cancel();
+                                    timer=null;
+                                }
                             }
-                        }else{
-                            timer.cancel();
                         }
-                    }
-                });
-            }
-        },10,10);
-
-        if(this.getTop()<headerHeight) {
-
-
+                    });
+                }
+            },10,10);
         }
     }
 
