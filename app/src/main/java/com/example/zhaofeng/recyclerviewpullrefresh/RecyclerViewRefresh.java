@@ -61,6 +61,7 @@ public class RecyclerViewRefresh extends LinearLayout
     private int mCurrentTargetOffsetTop;
     protected int mOriginalOffsetTop;
     private boolean mIsBeingDragged;
+    private boolean mIsBeingPullUp;
     private int mActivePointerId=INVALID_POINTER;
     private float mInitailDownY;
     private int mTouchSlop;
@@ -211,7 +212,8 @@ public class RecyclerViewRefresh extends LinearLayout
             mReturningToStart = false;
         }
 
-        if(!isEnabled() || mReturningToStart || canChildScrollUp()
+//        Log.d(LOG_TAG,(isEnabled()?"true":"false")+"  scrollUp="+(canChildScrollUp()?"true":"false"));
+        if(!isEnabled() || mReturningToStart || (canChildScrollUp()&&!ifLastItemVisible())
                 ||mRefreshing || mNestedScrollInProgress){
             return false;
         }
@@ -221,6 +223,7 @@ public class RecyclerViewRefresh extends LinearLayout
                 setTargetOffsetTopAndBottom(mOriginalOffsetTop-headerView.getTop(),true);
                 mActivePointerId=MotionEventCompat.getPointerId(ev,0);
                 mIsBeingDragged=false;
+                mIsBeingPullUp=false;
                 final float initialDownY=getMotionEventY(ev,mActivePointerId);
                 if(initialDownY==-1){
                     return false;
@@ -238,9 +241,16 @@ public class RecyclerViewRefresh extends LinearLayout
                     return false;
                 }
                 final float yDiff=y-mInitailDownY;
+                Log.d(LOG_TAG,"yDiff="+yDiff+" touchSlop="+mTouchSlop);
                 if(yDiff>mTouchSlop && !mIsBeingDragged){
                     mInitialMotionY=mInitailDownY+mTouchSlop;
                     mIsBeingDragged=true;
+                }
+                if(yDiff<-mTouchSlop&&!mIsBeingPullUp&&ifLastItemVisible())
+                {
+                    Log.d(LOG_TAG,"pullUp");
+                    mIsBeingPullUp=true;
+                    return true;
                 }
                 break;
             case MotionEventCompat.ACTION_POINTER_UP:
@@ -250,10 +260,19 @@ public class RecyclerViewRefresh extends LinearLayout
             case MotionEvent.ACTION_CANCEL:
                 mIsBeingDragged=false;
                 mActivePointerId=INVALID_POINTER;
-                Log.d(LOG_TAG,"intercept top="+thisView.getTop());
                 break;
         }
         return mIsBeingDragged;
+    }
+    private boolean ifLastItemVisible()
+    {
+        final RecyclerView recyclerView=(RecyclerView)mTarget;
+        LinearLayoutManager manager=(LinearLayoutManager)recyclerView.getLayoutManager();
+        if((manager.findLastVisibleItemPosition()+1)==manager.getItemCount())
+        {
+            return true;
+        }
+        return false;
     }
 
     private float getMotionEventY(MotionEvent ev,int activePointerId){
@@ -333,6 +352,10 @@ public class RecyclerViewRefresh extends LinearLayout
                     }else{
                         return false;
                     }
+                }
+                Log.d(LOG_TAG,"move");
+                if(mIsBeingPullUp){
+
                 }
                 break;
             }
