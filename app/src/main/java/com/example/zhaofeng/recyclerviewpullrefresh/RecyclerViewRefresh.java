@@ -252,6 +252,10 @@ public class RecyclerViewRefresh extends LinearLayout
                     mIsBeingPullUp=true;
                     return true;
                 }
+                if(ifLastItemVisible()&&yDiff>mTouchSlop)
+                {
+                    return false;
+                }
                 break;
             case MotionEventCompat.ACTION_POINTER_UP:
                 onSecondaryPointerUp(ev);
