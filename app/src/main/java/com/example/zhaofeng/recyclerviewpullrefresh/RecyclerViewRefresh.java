@@ -32,6 +32,7 @@ import android.widget.TextView;
 
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Created by zhaofeng on 16/5/9
@@ -45,16 +46,17 @@ public class RecyclerViewRefresh extends LinearLayout
     private static final int DEFAULT_CIRCLE_TARGET=64;
     private static final float DRAG_RATE=.5f;
 
+    private Context context;
     private View headerView,footerView,thisView;
     private View mTarget; //the target of the gesture
     private ImageView arrowIv;
     private TextView refreshTv;
-    private ProgressBar progressBar;
+    private ProgressBar progressBar,footerProgressBar;
     private OnPullToRefresh refreshListener=null;
     private OnDragToLoad loadListener=null;
     float startY=0;
 
-    private int headerHeight=0,currentHeaderHeight=0;
+    private int headerHeight=0,currentHeaderHeight=0,currentFooterHeight=0;
     private boolean mReturningToStart;
     private boolean mRefreshing=false;
     private boolean mNestedScrollInProgress;
@@ -62,6 +64,7 @@ public class RecyclerViewRefresh extends LinearLayout
     protected int mOriginalOffsetTop;
     private boolean mIsBeingDragged;
     private boolean mIsBeingPullUp;
+    private boolean isAddFooter=false;
     private int mActivePointerId=INVALID_POINTER;
     private float mInitailDownY;
     private int mTouchSlop;
@@ -88,11 +91,14 @@ public class RecyclerViewRefresh extends LinearLayout
     }
     private void initView(Context context)
     {
+        this.setOrientation(LinearLayout.VERTICAL);
+        this.context=context;
         thisView=this;
         mTouchSlop= ViewConfiguration.get(context).getScaledTouchSlop();
         headerView=LayoutInflater.from(context).inflate(R.layout.header_layout,null);
-        footerView=LayoutInflater.from(context).inflate(R.layout.header_layout,null);
+        footerView=LayoutInflater.from(context).inflate(R.layout.footer_layout,null);
         measureView(headerView);
+        measureView(footerView);
         arrowIv=(ImageView)headerView.findViewById(R.id.arrow);
         refreshTv=(TextView)headerView.findViewById(R.id.tip);
         progressBar=(ProgressBar)headerView.findViewById(R.id.progress);
@@ -241,19 +247,20 @@ public class RecyclerViewRefresh extends LinearLayout
                     return false;
                 }
                 final float yDiff=y-mInitailDownY;
-                Log.d(LOG_TAG,"yDiff="+yDiff+" touchSlop="+mTouchSlop);
                 if(yDiff>mTouchSlop && !mIsBeingDragged){
                     mInitialMotionY=mInitailDownY+mTouchSlop;
                     mIsBeingDragged=true;
                 }
-                if(yDiff<-mTouchSlop&&!mIsBeingPullUp&&ifLastItemVisible())
+                if(yDiff<-mTouchSlop&&!mIsBeingPullUp&&ifLastItemVisible()&&!isAddFooter)
                 {
                     Log.d(LOG_TAG,"pullUp");
+                    mInitialMotionY=mInitailDownY+mTouchSlop;
                     mIsBeingPullUp=true;
                     return true;
                 }
                 if(ifLastItemVisible()&&yDiff>mTouchSlop)
                 {
+                    isAddFooter=false;
                     return false;
                 }
                 break;
@@ -333,7 +340,7 @@ public class RecyclerViewRefresh extends LinearLayout
             mReturningToStart=false;
         }
         if(!isEnabled() || mReturningToStart
-                || canChildScrollUp() || mNestedScrollInProgress){
+                || (canChildScrollUp()&&!ifLastItemVisible()) || mNestedScrollInProgress){
             //Fail fast if we're not in a state where a swipe is possible
             return false;
         }
@@ -350,6 +357,8 @@ public class RecyclerViewRefresh extends LinearLayout
                 }
                 final float y=MotionEventCompat.getY(event,pointerIndex);
                 final float overscrollTop=(y-mInitialMotionY)*DRAG_RATE;
+                Log.d(LOG_TAG,"move overscroll="+overscrollTop+" y="+y+" mInitialMotionY="+mInitialMotionY+"  mIsBeingDragged="+(mIsBeingDragged?"true":"false")
+                    +"  mIsBeingPullUp="+(mIsBeingPullUp?"true":"false"));
                 if(mIsBeingDragged){
                     if(overscrollTop>0){
                         moveSpinner(overscrollTop);
@@ -357,9 +366,26 @@ public class RecyclerViewRefresh extends LinearLayout
                         return false;
                     }
                 }
-                Log.d(LOG_TAG,"move");
-                if(mIsBeingPullUp){
-
+                if(mIsBeingPullUp&&!isAddFooter){
+                    Log.d(LOG_TAG,"isAddFooter="+(isAddFooter?"true":"false"));
+                    if(overscrollTop<0&&!isAddFooter){
+                        isAddFooter=true;
+                        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                                footerView.getMeasuredHeight());
+                        Log.d(LOG_TAG,"addFooterView height="+footerView.getMeasuredHeight()
+                            +" childcount="+this.getChildCount());
+                        if(this.getChildCount()==2)
+                        {
+                            this.addView(footerView,lp);
+                            footerView.setVisibility(View.VISIBLE);
+                            invalidate();
+                        }
+//                        float listY=this.getChildAt(1).getY();
+//                        this.getChildAt(1).setY(listY-footerView.getMeasuredHeight());
+                        Log.d(LOG_TAG,"childcount="+this.getChildCount());
+                    }else{
+                        return false;
+                    }
                 }
                 break;
             }
@@ -406,6 +432,7 @@ public class RecyclerViewRefresh extends LinearLayout
 
         int targetY=mOriginalOffsetTop+(int)((slingshotDist*dragPercent)+extraMove);
         setTargetOffsetTopAndBottom(targetY-mCurrentTargetOffsetTop,true);
+
     }
     private void finishSpinner(){
         if(currentHeaderHeight<0){
