@@ -327,7 +327,7 @@ public class RecyclerViewRefresh extends RelativeLayout
                     mInitialMotionY=mInitailDownY+mTouchSlop;
                     mIsBeingDragged=true;
                 }
-                Log.d(LOG_TAG,"AddFooter="+(isAddFooter?"true":"false"));
+//                Log.d(LOG_TAG,"AddFooter="+(isAddFooter?"true":"false"));
                 if(yDiff<-mTouchSlop&&!mIsBeingPullUp&&ifLastItemVisible()&&!isAddFooter)
                 {
                     mInitialMotionY=mInitailDownY+mTouchSlop;
