@@ -26,6 +26,20 @@ RecyclerView下拉刷新,上拉加载
 完成上拉加载
 
 使用如何使用：
+1.xml文件中
+
+<com.example.zhaofeng.recyclerviewpullrefresh.RecyclerViewRefresh
+        android:id="@+id/refreshpull"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/recyclerview"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+    </com.example.zhaofeng.recyclerviewpullrefresh.RecyclerViewRefresh>
+    
+2.代码
 
 
     Handler handler=new Handler(new Handler.Callback() {
