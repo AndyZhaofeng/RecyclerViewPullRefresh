@@ -1,4 +1,6 @@
 # RecyclerViewPullRefresh
+
+希望大家发现问题，告诉我（526637166@qq.com）
 RecyclerView下拉刷新,上拉加载
 完成（已经完成下拉刷新，上拉加载）
 
