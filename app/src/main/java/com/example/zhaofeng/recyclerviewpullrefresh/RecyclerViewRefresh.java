@@ -1,5 +1,6 @@
 package com.example.zhaofeng.recyclerviewpullrefresh;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.os.Build;
 import android.os.Handler;
@@ -20,6 +21,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
+import android.view.animation.AnimationSet;
 import android.view.animation.RotateAnimation;
 import android.view.animation.Transformation;
 import android.view.animation.TranslateAnimation;
@@ -37,7 +39,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * Created by zhaofeng on 16/5/9
  */
-public class RecyclerViewRefresh extends LinearLayout
+public class RecyclerViewRefresh extends RelativeLayout
 {
     private static final String LOG_TAG=RecyclerViewRefresh.class.getSimpleName();
     private static final int INVALID_POINTER=-1;
@@ -91,23 +93,19 @@ public class RecyclerViewRefresh extends LinearLayout
     }
     private void initView(Context context)
     {
-        this.setOrientation(LinearLayout.VERTICAL);
+//        this.setOrientation(LinearLayout.VERTICAL);
         this.context=context;
         thisView=this;
         mTouchSlop= ViewConfiguration.get(context).getScaledTouchSlop();
-        headerView=LayoutInflater.from(context).inflate(R.layout.header_layout,null);
+        headerView= LayoutInflater.from(context).inflate(R.layout.header_layout,null);
         footerView=LayoutInflater.from(context).inflate(R.layout.footer_layout,null);
-        measureView(headerView);
-        measureView(footerView);
         arrowIv=(ImageView)headerView.findViewById(R.id.arrow);
         refreshTv=(TextView)headerView.findViewById(R.id.tip);
         progressBar=(ProgressBar)headerView.findViewById(R.id.progress);
+        measureView(headerView);
+        measureView(footerView);
         headerHeight=headerView.getMeasuredHeight();
         currentHeaderHeight=headerHeight;
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                headerView.getMeasuredHeight());
-        this.addView(headerView,lp);
-        setTopHeader(headerHeight);
 
         final DisplayMetrics metrics=getResources().getDisplayMetrics();
         mSpinnerFinalOffset=DEFAULT_CIRCLE_TARGET*metrics.density;
@@ -137,7 +135,6 @@ public class RecyclerViewRefresh extends LinearLayout
     }
     private void setTopHeader(int height)
     {
-//        ViewGroup.LayoutParams lp=headerView.getLayoutParams();
         if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.HONEYCOMB)
         {
             this.setY(-height);
@@ -184,6 +181,85 @@ public class RecyclerViewRefresh extends LinearLayout
         }
     }
 
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
+        if(this.getChildCount()==1){
+            ensureTarget();
+            RelativeLayout.LayoutParams lp=new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    headerView.getMeasuredHeight());
+            lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+            headerView.setId(R.id.header_refresh);
+            this.addView(headerView,lp);
+            RelativeLayout.LayoutParams lpFooter=new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    footerView.getMeasuredHeight());
+            lpFooter.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+            footerView.setId(R.id.footer_progress);
+            this.addView(footerView,lpFooter);
+
+            RelativeLayout.LayoutParams layoutParams=new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+//            layoutParams.bottomMargin=footerView.getMeasuredHeight();
+            layoutParams.addRule(RelativeLayout.BELOW,R.id.header_refresh);
+            layoutParams.addRule(RelativeLayout.ABOVE,R.id.footer_load);
+            mTarget.setLayoutParams(layoutParams);
+            footerView.setVisibility(View.GONE);
+            setTopHeader(headerHeight);
+            invalidate();
+        }
+    }
+
+    private void animateShow(View view)
+    {
+        AnimationSet animationSet = new AnimationSet(true);
+        TranslateAnimation translateAnimation = new TranslateAnimation(
+                Animation.RELATIVE_TO_SELF, 0.0f,
+                Animation.RELATIVE_TO_SELF, 0.0f,
+                Animation.RELATIVE_TO_SELF, 1.0f,
+                Animation.RELATIVE_TO_SELF, 0.0f);
+        translateAnimation.setDuration(800);
+        animationSet.addAnimation(translateAnimation);
+        view.setAnimation(animationSet);
+        loadListener.onLoad();
+    }
+    private void animateHide(View view)
+    {
+        view.clearAnimation();
+        AnimationSet animationSet = new AnimationSet(true);
+        TranslateAnimation translateAnimation = new TranslateAnimation(
+                Animation.RELATIVE_TO_SELF, 0.0f,
+                Animation.RELATIVE_TO_SELF, 0.0f,
+                Animation.RELATIVE_TO_SELF, 0.0f,
+                Animation.RELATIVE_TO_SELF, 1.0f);
+        translateAnimation.setDuration(800);
+        animationSet.addAnimation(translateAnimation);
+        view.setAnimation(animationSet);
+        animationSet.setAnimationListener(new Animation.AnimationListener() {
+            @Override
+            public void onAnimationStart(Animation animation) {
+
+            }
+
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                footerView.setVisibility(View.GONE);
+//                mIsBeingPullUp=false;
+                isAddFooter=false;
+            }
+
+            @Override
+            public void onAnimationRepeat(Animation animation) {
+
+            }
+        });
+    }
+    private void moveTarget()
+    {
+        ValueAnimator valueAnimator=ValueAnimator.ofFloat(0,-footerView.getMeasuredHeight());
+        valueAnimator.setTarget(mTarget);
+        valueAnimator.setDuration(800).start();
+    }
+
     /**
      * @return Whether it is possible for the child view of this layout to
      * scroll up.Override this if the child view is a custom view.
@@ -212,7 +288,7 @@ public class RecyclerViewRefresh extends LinearLayout
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         ensureTarget();
-        final int action=MotionEventCompat.getActionMasked(ev);
+        final int action= MotionEventCompat.getActionMasked(ev);
 
         if(mReturningToStart && action == MotionEvent.ACTION_DOWN){
             mReturningToStart = false;
@@ -251,9 +327,9 @@ public class RecyclerViewRefresh extends LinearLayout
                     mInitialMotionY=mInitailDownY+mTouchSlop;
                     mIsBeingDragged=true;
                 }
+                Log.d(LOG_TAG,"AddFooter="+(isAddFooter?"true":"false"));
                 if(yDiff<-mTouchSlop&&!mIsBeingPullUp&&ifLastItemVisible()&&!isAddFooter)
                 {
-                    Log.d(LOG_TAG,"pullUp");
                     mInitialMotionY=mInitailDownY+mTouchSlop;
                     mIsBeingPullUp=true;
                     return true;
@@ -314,7 +390,6 @@ public class RecyclerViewRefresh extends LinearLayout
                     animation.setFillAfter(true);
                     arrowIv.startAnimation(animation);
                 }
-                Log.d(LOG_TAG,"top="+this.getY());
             }
         }
 
@@ -357,8 +432,6 @@ public class RecyclerViewRefresh extends LinearLayout
                 }
                 final float y=MotionEventCompat.getY(event,pointerIndex);
                 final float overscrollTop=(y-mInitialMotionY)*DRAG_RATE;
-                Log.d(LOG_TAG,"move overscroll="+overscrollTop+" y="+y+" mInitialMotionY="+mInitialMotionY+"  mIsBeingDragged="+(mIsBeingDragged?"true":"false")
-                    +"  mIsBeingPullUp="+(mIsBeingPullUp?"true":"false"));
                 if(mIsBeingDragged){
                     if(overscrollTop>0){
                         moveSpinner(overscrollTop);
@@ -367,24 +440,9 @@ public class RecyclerViewRefresh extends LinearLayout
                     }
                 }
                 if(mIsBeingPullUp&&!isAddFooter){
-                    Log.d(LOG_TAG,"isAddFooter="+(isAddFooter?"true":"false"));
                     if(overscrollTop<0&&!isAddFooter){
                         isAddFooter=true;
-                        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                                footerView.getMeasuredHeight());
-                        Log.d(LOG_TAG,"addFooterView height="+footerView.getMeasuredHeight()
-                            +" childcount="+this.getChildCount());
-                        if(this.getChildCount()==2)
-                        {
-                            this.addView(footerView,lp);
-                            footerView.setVisibility(View.VISIBLE);
-                            invalidate();
-                        }
-//                        float listY=this.getChildAt(1).getY();
-//                        this.getChildAt(1).setY(listY-footerView.getMeasuredHeight());
-                        Log.d(LOG_TAG,"childcount="+this.getChildCount());
-                    }else{
-                        return false;
+                        showFooter();
                     }
                 }
                 break;
@@ -408,7 +466,6 @@ public class RecyclerViewRefresh extends LinearLayout
                     return false;
                 }
                 final float y=MotionEventCompat.getY(event,pointerIndex);
-                mIsBeingDragged=false;
                 finishSpinner();
                 mActivePointerId=INVALID_POINTER;
                 return false;
@@ -434,6 +491,30 @@ public class RecyclerViewRefresh extends LinearLayout
         setTargetOffsetTopAndBottom(targetY-mCurrentTargetOffsetTop,true);
 
     }
+    private void showFooter()
+    {
+        if(footerView.getVisibility()==View.GONE)
+        {
+            footerView.setVisibility(View.VISIBLE);
+            animateShow(footerView);
+//            moveTarget();
+//            RelativeLayout.LayoutParams layoutParams=(RelativeLayout.LayoutParams)mTarget.getLayoutParams();
+//            layoutParams.bottomMargin=footerView.getMeasuredHeight();
+//            mTarget.setLayoutParams(layoutParams);
+            invalidate();
+        }
+    }
+    private void hideFooter()
+    {
+        if(footerView.getVisibility()==View.VISIBLE)
+        {
+            animateHide(footerView);
+//            RelativeLayout.LayoutParams layoutParams=(RelativeLayout.LayoutParams)mTarget.getLayoutParams();
+//            layoutParams.bottomMargin=0;
+//            mTarget.setLayoutParams(layoutParams);
+//            invalidate();
+        }
+    }
     private void finishSpinner(){
         if(currentHeaderHeight<0){
             setRefreshing(true,true);
@@ -441,6 +522,11 @@ public class RecyclerViewRefresh extends LinearLayout
             //cancel refresh
             mRefreshing=false;
             animateOffsetToStartPosition();
+        }
+        if(mIsBeingDragged)
+        {
+            mIsBeingDragged=false;
+            setLoading(false);
         }
     }
     private void setRefreshing(boolean refreshing,final boolean notify)
@@ -464,6 +550,16 @@ public class RecyclerViewRefresh extends LinearLayout
     public void setRefreshing(boolean refreshing){
         if(!refreshing){
             setRefreshing(refreshing,false);
+        }
+    }
+    public void setLoading(boolean notify){
+        setLoading(true,notify);
+    }
+    private void setLoading(boolean isBeingLoading,final boolean notify)
+    {
+        if(footerView.getVisibility()==View.VISIBLE)
+        {
+            hideFooter();
         }
     }
     private void animateOffsetToStartPosition(){

@@ -26,6 +26,7 @@ public class MainActivity extends AppCompatActivity {
     DemoAdapter demoAdapter;
     ArrayList<String> list;
     ViewPager viewPager;
+    int topAdd=0,endAdd=0;
 
     Handler handler=new Handler(new Handler.Callback() {
         @Override
@@ -33,6 +34,10 @@ public class MainActivity extends AppCompatActivity {
             if(msg.what==0)
             {
                 recyclerViewRefresh.setRefreshing(false);
+                demoAdapter.notifyDataSetChanged();
+            }else if(msg.what==1)
+            {
+                recyclerViewRefresh.setLoading(false);
                 demoAdapter.notifyDataSetChanged();
             }
             return false;
@@ -42,9 +47,20 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onRefresh() {
             for(int i=0;i<10;++i){
-                list.add(i,"add"+i);
+                list.add(i,"add"+(topAdd++));
             }
             handler.sendEmptyMessageDelayed(0,3000);
+        }
+    };
+
+    RecyclerViewRefresh.OnDragToLoad loadToRefresh=new RecyclerViewRefresh.OnDragToLoad() {
+        @Override
+        public void onLoad() {
+            for(int i=0;i<10;++i)
+            {
+                list.add("load"+(endAdd++));
+            }
+            handler.sendEmptyMessageDelayed(1,1500);
         }
     };
 
@@ -59,5 +75,6 @@ public class MainActivity extends AppCompatActivity {
         demoAdapter=new DemoAdapter(list,this);
         recyclerView.setAdapter(demoAdapter);
         recyclerViewRefresh.setOnPullToRefresh(pullToRefresh);
+        recyclerViewRefresh.setOnDragToLoad(loadToRefresh);
     }
 }
