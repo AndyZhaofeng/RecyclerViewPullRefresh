@@ -26,7 +26,9 @@ RecyclerView下拉刷新,上拉加载
 完成上拉加载
 
 使用如何使用：
-Handler handler=new Handler(new Handler.Callback() {
+
+
+    Handler handler=new Handler(new Handler.Callback() {
         @Override
         public boolean handleMessage(Message msg) {
             if(msg.what==0)
