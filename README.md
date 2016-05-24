@@ -1,7 +1,11 @@
 # RecyclerViewPullRefresh
-RecyclerView下拉刷新
-还未完成（已经完成下拉刷新，开始写上拉加载）
+
+希望大家发现问题，告诉我（526637166@qq.com）
+RecyclerView下拉刷新,上拉加载
+完成（已经完成下拉刷新，上拉加载）
+
 目前进度：
+
 2016-05-11 仿照SwipeRefreshLayout(23.3.0)中的onInterceptionTouchEvent和onTouchEvent中的
 逻辑重写RecyclerViewRefresh中对应的两个函数逻辑
 
@@ -19,3 +23,63 @@ RecyclerView下拉刷新
 
 2016-05-17：
 开始添加上拉加载，但是遇到一个棘手的问题，用addView添加view之后，不显示。
+
+2016-05-18:
+完成上拉加载
+
+使用如何使用：
+
+1.xml使用，参照activity_main.xml
+    
+2.代码
+
+
+    Handler handler=new Handler(new Handler.Callback() {
+        @Override
+        public boolean handleMessage(Message msg) {
+            if(msg.what==0)
+            {
+                recyclerViewRefresh.setRefreshing(false);
+                demoAdapter.notifyDataSetChanged();
+            }else if(msg.what==1)
+            {
+                recyclerViewRefresh.setLoading(false);
+                demoAdapter.notifyDataSetChanged();
+            }
+            return false;
+        }
+    });
+    RecyclerViewRefresh.OnPullToRefresh pullToRefresh=new RecyclerViewRefresh.OnPullToRefresh() {
+        @Override
+        public void onRefresh() {
+            for(int i=0;i<10;++i){
+                list.add(i,"add"+(topAdd++));
+            }
+            handler.sendEmptyMessageDelayed(0,3000);
+        }
+    };
+
+    RecyclerViewRefresh.OnDragToLoad loadToRefresh=new RecyclerViewRefresh.OnDragToLoad() {
+        @Override
+        public void onLoad() {
+            for(int i=0;i<10;++i)
+            {
+                list.add("load"+(endAdd++));
+            }
+            handler.sendEmptyMessageDelayed(1,1500);
+        }
+    };
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        ButterKnife.bind(this);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this,LinearLayoutManager.VERTICAL,false));
+        list= Lists.newArrayList("test1","test2","test3","test4","test5",
+                "test6","test7","test8","test9","test10","test11");
+        demoAdapter=new DemoAdapter(list,this);
+        recyclerView.setAdapter(demoAdapter);
+        recyclerViewRefresh.setOnPullToRefresh(pullToRefresh);
+        recyclerViewRefresh.setOnDragToLoad(loadToRefresh);
+    }
