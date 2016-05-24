@@ -74,8 +74,8 @@ public class MainActivity extends AppCompatActivity {
                 "test6","test7","test8","test9","test10","test11");
         demoAdapter=new DemoAdapter(list,this);
         recyclerView.setAdapter(demoAdapter);
-        recyclerViewRefresh.setCanRefresh(false);
-        recyclerViewRefresh.setCanLoad(false);
+        recyclerViewRefresh.setCanRefresh(false);//关闭下拉刷新
+        recyclerViewRefresh.setCanLoad(false);//关闭上拉加载
         recyclerViewRefresh.setOnPullToRefresh(pullToRefresh);
         recyclerViewRefresh.setOnDragToLoad(loadToRefresh);
     }
