@@ -74,6 +74,7 @@ public class RecyclerViewRefresh extends RelativeLayout
     private float mInitialMotionY;
     private float mSpinnerFinalOffset;
     private boolean updateHeader=true;
+    private boolean canLoad=true,canRefresh=true;
     private Handler handler=new Handler();
     private Timer timer;
 
@@ -323,12 +324,12 @@ public class RecyclerViewRefresh extends RelativeLayout
                     return false;
                 }
                 final float yDiff=y-mInitailDownY;
-                if(yDiff>mTouchSlop && !mIsBeingDragged){
+                if(yDiff>mTouchSlop && !mIsBeingDragged&&canRefresh){
                     mInitialMotionY=mInitailDownY+mTouchSlop;
                     mIsBeingDragged=true;
                 }
 //                Log.d(LOG_TAG,"AddFooter="+(isAddFooter?"true":"false"));
-                if(yDiff<-mTouchSlop&&!mIsBeingPullUp&&ifLastItemVisible()&&!isAddFooter)
+                if(yDiff<-mTouchSlop&&!mIsBeingPullUp&&ifLastItemVisible()&&!isAddFooter&&canLoad)
                 {
                     mInitialMotionY=mInitailDownY+mTouchSlop;
                     mIsBeingPullUp=true;
@@ -597,6 +598,22 @@ public class RecyclerViewRefresh extends RelativeLayout
                 }
             },10,10);
         }
+    }
+
+    public boolean isCanLoad() {
+        return canLoad;
+    }
+
+    public void setCanLoad(boolean canLoad) {
+        this.canLoad = canLoad;
+    }
+
+    public boolean isCanRefresh() {
+        return canRefresh;
+    }
+
+    public void setCanRefresh(boolean canRefresh) {
+        this.canRefresh = canRefresh;
     }
 
     /**
