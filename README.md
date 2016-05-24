@@ -27,6 +27,9 @@ RecyclerView下拉刷新,上拉加载
 2016-05-18:
 完成上拉加载
 
+2016-05-24:
+添加打开关闭上拉加载，下拉刷新功能。
+
 使用如何使用：
 
 1.xml使用，参照activity_main.xml
@@ -83,3 +86,8 @@ RecyclerView下拉刷新,上拉加载
         recyclerViewRefresh.setOnPullToRefresh(pullToRefresh);
         recyclerViewRefresh.setOnDragToLoad(loadToRefresh);
     }
+
+打开关闭上拉加载，下拉刷新：
+
+recyclerViewRefresh.setCanRefresh(false);//关闭下拉刷新
+recyclerViewRefresh.setCanLoad(false);//关闭上拉加载
